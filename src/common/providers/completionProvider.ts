@@ -288,12 +288,9 @@ export class CompletionProvider {
           nodeAtPosition.parent.parent,
           replaceRange,
         );
-      } else if (TreeUtils.findParentOfType("record_expr", nodeAtPosition)) {
-        const node = TreeUtils.findParentOfType("record_expr", nodeAtPosition);
-        if (!node) return [];
-
+      } else if (nodeAtPosition.parent?.parent?.type === "record_expr") {
         return this.getRecordCompletions(
-          node,
+          nodeAtPosition,
           sourceFile,
           replaceRange,
           params.program,
@@ -314,9 +311,8 @@ export class CompletionProvider {
                 (child) => child.type === "lower_case_identifier",
               ),
             )
-            .map((node) => node?.text)
-            .reduce((acc, x) => {
-              if (typeof x === "string") acc.push(x);
+            .reduce((acc, node) => {
+              if (typeof node?.text === "string") acc.push(node.text);
               return acc;
             }, [] as string[]);
 
