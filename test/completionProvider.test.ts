@@ -262,7 +262,59 @@ view model =
     await testCompletions(source, ["item1", "item2"], "exactMatch");
   });
 
-  it("A record return type should have completions", async () => {
+  it("should allow you to auto complete the record fields, without needing to type anything", async () => {
+    const source = `
+--@ Test.elm
+module Test exposing (..)
+
+type alias Model =
+  { prop1: String
+  , prop2: Int
+  }
+
+view : Model
+view =
+  { {-caret-} }
+`;
+
+    await testCompletions(source, ["prop1", "prop2"], "exactMatch");
+  });
+
+  it("should only give completions on not already used fields", async () => {
+    const source = `
+--@ Test.elm
+module Test exposing (..)
+
+type alias Model =
+  { prop1: String
+  , prop2: Int
+  }
+
+view : Model
+view =
+  { prop1 = "", {-caret-} }
+`;
+
+    await testCompletions(source, ["prop2"], "exactMatch");
+
+    const source2 = `
+--@ Test.elm
+module Test exposing (..)
+
+type alias Model =
+  { prop1: String
+  , prop2: Int
+  }
+
+view : Model
+view =
+  { prop2 = "", {-caret-} }
+`;
+
+    await testCompletions(source2, ["prop1"], "exactMatch");
+  });
+
+  it("A record return type should have completions when completing on field name", async () => {
     const source = `
 --@ Test.elm
 module Test exposing (..)
