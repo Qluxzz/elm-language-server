@@ -295,6 +295,44 @@ export class CompletionProvider {
           replaceRange,
           params.program,
         );
+      } else if (
+        nodeAtPosition.type === "record_expr" &&
+        this.getValueExprSibling(nodeAtPosition) !== null
+      ) {
+        const { node, times } = this.getValueExprSibling(nodeAtPosition);
+        if (!node) throw new Error();
+
+        const type = checker.findType(node);
+        if (
+          type.nodeType === "Function" &&
+          type.params[times - 1].nodeType === "Record"
+        ) {
+          const param = type.params[times - 1];
+          if (param.nodeType === "Record") {
+            return Object.entries(param.fields).map(([name, field]) => {
+              const hint = HintHelper.createHintForTypeAliasReference(
+                checker.typeToString(field),
+                name,
+                param.alias?.name ?? "",
+              );
+
+              return this.createFieldOrParameterCompletion(
+                hint,
+                name,
+                replaceRange,
+              );
+            });
+          }
+        }
+      } else if (
+        nodeAtPosition.type === "record_expr" &&
+        nodeAtPosition.parent !== null
+      ) {
+        return this.getRecordCompletionsUsingInference(
+          checker,
+          nodeAtPosition.parent,
+          replaceRange,
+        );
       }
 
       let targetNode;
@@ -421,6 +459,22 @@ export class CompletionProvider {
       };
     }
   };
+
+  private getValueExprSibling(node: SyntaxNode): {
+    node: SyntaxNode | null;
+    times: number;
+  } {
+    let times = 0;
+    if (node.type === "value_expr") return { node, times };
+
+    let search: SyntaxNode | null = node;
+    while (search !== null && search?.type !== "value_expr") {
+      times++;
+      search = search?.previousSibling;
+    }
+
+    return { node: search, times };
+  }
 
   private findPreviousWord(
     currentCharacter: number,
