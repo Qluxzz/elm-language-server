@@ -262,6 +262,57 @@ view model =
     await testCompletions(source, ["item1", "item2"], "exactMatch");
   });
 
+  it("should give completions on function record argument", async () => {
+    const source = `
+--@ Test.elm
+module Test exposing (..)
+
+test : { prop1: String, prop2: Int } -> ()
+test _ = ()
+
+main =
+  test { {-caret-} }
+`;
+
+    await testCompletions(source, ["prop1", "prop2"], "exactMatch");
+
+    const source2 = `
+--@ Test.elm
+module Test exposing (..)
+
+test : { prop1: String, prop2: Int } -> { prop3: String, prop4: Int } ()
+test _ = ()
+
+main =
+  test { prop1 = "Foo", prop2 = 10 } { {-caret-} }
+`;
+
+    await testCompletions(source2, ["prop3", "prop4"], "exactMatch");
+
+    const source3 = `
+    --@ Test.elm
+    module Test exposing (..)
+    
+    test :
+        Int
+        -> Int
+        -> Int
+        -> { prop1 : String, prop2 : Int }
+        -> Int
+        -> Int
+        -> Int
+        -> { prop3 : String, prop4 : Int }
+        -> ()
+    test _ _ _ _ _ _ _ _ =
+        ()
+    
+    main =
+      test 1 2 3 { {-caret-} }
+    `;
+
+    await testCompletions(source3, ["prop1", "prop2"], "exactMatch");
+  });
+
   it("A record return type should have completions", async () => {
     const source = `
 --@ Test.elm
