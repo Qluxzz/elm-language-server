@@ -335,6 +335,46 @@ export class CompletionProvider {
               ).toVSPosition(),
             );
           }
+        } else if (
+          // This is in the case when you're using auto complete on an empty record
+          // It will work as long as the function return type is typed
+          nodeAtPosition.type === "record_expr" &&
+          nodeAtPosition.parent !== null
+        ) {
+          // TODO: Check if this can be incorporated with the other clause that deals with record expr, at line 292
+          const type = checker.findType(nodeAtPosition.parent);
+          if ("fields" in type) {
+            const alreadyUsedFields = nodeAtPosition.children
+              .filter((x) => x.type === "field")
+              .map((x) =>
+                x.children.find(
+                  (child) => child.type === "lower_case_identifier",
+                ),
+              )
+              .map((node) => node?.text)
+              .reduce((acc, x) => {
+                if (typeof x === "string") acc.push(x);
+                return acc;
+              }, [] as string[]);
+
+            return Object.entries(type.fields)
+              .filter(
+                ([name]) => !alreadyUsedFields.some((f) => f.includes(name)),
+              )
+              .map(([name, info]) => {
+                const hint = HintHelper.createHintForTypeAliasReference(
+                  checker.typeToString(info),
+                  name,
+                  type.alias?.name ?? "",
+                );
+
+                return this.createFieldOrParameterCompletion(
+                  hint,
+                  name,
+                  replaceRange,
+                );
+              });
+          }
         } else {
           if (contextNode.type === "import") {
             return this.getImportableModules(
