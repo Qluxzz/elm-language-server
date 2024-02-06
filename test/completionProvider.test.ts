@@ -280,6 +280,27 @@ view =
     await testCompletions(source, ["prop1", "prop2"], "exactMatch");
   });
 
+  it.only("should allow you to auto complete the record fields of a nested object, without needing to type anything", async () => {
+    const source = `
+--@ Test.elm
+module Test exposing (..)
+
+type alias Model =
+  { nested: 
+    { prop3: Bool
+    , prop4: Float
+    }
+  , prop1: Int
+  }
+
+view : Model
+view =
+  { nested = { {-caret-} } }
+`;
+
+    await testCompletions(source, ["prop3", "prop4"], "exactMatch");
+  });
+
   it("should only give completions on not already used fields", async () => {
     const source = `
 --@ Test.elm
