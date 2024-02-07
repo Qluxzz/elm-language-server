@@ -299,15 +299,15 @@ export class CompletionProvider {
         nodeAtPosition.type === "record_expr" &&
         this.getValueExprSibling(nodeAtPosition) !== null
       ) {
-        const { node, times } = this.getValueExprSibling(nodeAtPosition);
+        const { node, reverseIndex } = this.getValueExprSibling(nodeAtPosition);
         if (!node) throw new Error();
 
         const type = checker.findType(node);
         if (
           type.nodeType === "Function" &&
-          type.params[times - 1].nodeType === "Record"
+          type.params[reverseIndex - 1].nodeType === "Record"
         ) {
-          const param = type.params[times - 1];
+          const param = type.params[reverseIndex - 1];
           if (param.nodeType === "Record") {
             return Object.entries(param.fields).map(([name, field]) => {
               const hint = HintHelper.createHintForTypeAliasReference(
@@ -462,18 +462,20 @@ export class CompletionProvider {
 
   private getValueExprSibling(node: SyntaxNode): {
     node: SyntaxNode | null;
-    times: number;
+    reverseIndex: number;
   } {
-    let times = 0;
-    if (node.type === "value_expr") return { node, times };
+    // We need this to know what function argument we started on when walking backwards
+    // to the value expr sibling
+    let reverseIndex = 0;
+    if (node.type === "value_expr") return { node, reverseIndex };
 
     let search: SyntaxNode | null = node;
     while (search !== null && search?.type !== "value_expr") {
-      times++;
+      reverseIndex++;
       search = search?.previousSibling;
     }
 
-    return { node: search, times };
+    return { node: search, reverseIndex };
   }
 
   private findPreviousWord(
