@@ -239,6 +239,24 @@ view model =
     await testCompletions(source, ["prop1", "prop2"], "exactMatch");
   });
 
+  it.only("Updating a record should have completions, without having to start with a character", async () => {
+    const source = `
+--@ Test.elm
+module Test exposing (..)
+
+type alias Model =
+  { prop1: String
+  , prop2: Int
+  }
+
+view : Model -> Model
+view model =
+  { model | {-caret-} }
+`;
+
+    await testCompletions(source, ["prop1", "prop2"], "exactMatch");
+  });
+
   it("Updating a nested record should have completions", async () => {
     const source = `
 --@ Test.elm
