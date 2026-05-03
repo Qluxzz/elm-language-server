@@ -190,4 +190,86 @@ type alias Foo =
       "\n```elm\nbar: Int\n```\n\n\n---\n\nThis is a comment explaining bar\n\nField on the type alias `Foo`",
     );
   });
+
+  it("should show what branches the wildcard catches", async () => {
+    const source = `
+--@ Test.elm
+module Test exposing (..)
+
+type Example = Foo | Bar | Biz
+
+example : Example -> String
+example v =
+    case v of
+        Foo -> "foo"
+
+        _ -> "Other"
+      --^
+`;
+
+    await testHover(source, "Bar | Biz");
+  });
+
+  it("should show what branches the wildcard catches, if they're nested in a Maybe", async () => {
+    const source = `
+--@ Test.elm
+module Test exposing (..)
+
+type Example = Foo | Bar | Biz
+
+example : Maybe Example -> String
+example v =
+    case v of
+        Just Foo -> "foo"
+
+        _ -> "Other"
+      --^
+`;
+    await testHover(source, "Just Bar | Just Biz | Nothing");
+  });
+
+  it("should show what branches the wildcard catches, when type has associated data", async () => {
+    const source = `
+--@ Test.elm
+module Test exposing (..)
+
+type Example 
+  = Foo Int
+  | Bar String
+  | Biz Float
+
+example : Example -> String
+example v =
+    case v of
+        Foo _ -> "foo"
+
+        _ -> "Other"
+      --^
+`;
+    await testHover(source, "Bar _ | Biz _");
+  });
+
+  it("should show what branches the wildcard catches, including prefix", async () => {
+    const source = `
+--@ Example.elm
+module Example exposing(Type(..))
+
+type Type = Foo | Bar | Biz
+
+--@ Test.elm
+module Test exposing (..)
+
+import Example
+
+example : Example.Type -> String
+example v =
+    case v of
+        Example.Foo -> "foo"
+
+        _ -> "Other"
+      --^
+`;
+
+    await testHover(source, "Example.Bar | Example.Biz");
+  });
 });

@@ -5,12 +5,14 @@ import {
   MarkupKind,
   TextDocumentPositionParams,
 } from "vscode-languageserver";
+import { SyntaxNode } from "web-tree-sitter";
 import { URI } from "vscode-uri";
 import { DiagnosticsProvider } from ".";
 import { ISymbol } from "../../compiler/binder";
 import { getEmptyTypes } from "../../compiler/utils/elmUtils";
 import { ElmWorkspaceMatcher } from "../util/elmWorkspaceMatcher";
 import { HintHelper } from "../util/hintHelper";
+import { PatternMatches } from "../../compiler/patternMatches";
 import { TreeUtils } from "../util/treeUtils";
 import { ITextDocumentPositionParams } from "./paramsExtensions";
 
@@ -83,6 +85,17 @@ export class HoverProvider {
             },
           };
         }
+
+        if (
+          nodeAtPosition.type === "anything_pattern" ||
+          nodeAtPosition.parent?.type === "anything_pattern"
+        ) {
+          const hover = this.createHoverForBranchesHandledByWildcardInCaseOf(
+            nodeAtPosition,
+            params,
+          );
+          if (hover) return hover;
+        }
       }
     }
   };
@@ -111,5 +124,79 @@ export class HoverProvider {
         };
       }
     }
+  }
+
+  /**
+   * Return the branches that is handled by the `_` (wildcard) in a case of
+   */
+  private createHoverForBranchesHandledByWildcardInCaseOf(
+    node: SyntaxNode,
+    params: ITextDocumentPositionParams,
+  ): Hover | undefined {
+    const wildCardPattern = TreeUtils.findParentOfType("case_of_branch", node);
+    const caseNode = TreeUtils.findParentOfType("case_of_expr", node);
+
+    if (!wildCardPattern || !caseNode) {
+      return;
+    }
+
+    const handledPatterns: SyntaxNode[] = [];
+    for (const n of caseNode.namedChildren) {
+      if (n.type !== "case_of_branch") {
+        continue;
+      }
+
+      // Even if there would be more cases after the wildcard
+      // They would be marked as redundant since the wildcard preceding them would handle all of them
+      // So we break here and treat them all as covered by the wildcard
+      if (n.id === wildCardPattern.id) {
+        break;
+      }
+
+      const pattern = n.childForFieldName("pattern");
+      if (pattern) {
+        handledPatterns.push(pattern);
+      }
+    }
+
+    if (handledPatterns.length === 0) {
+      return;
+    }
+
+    const wildcardPatterns = PatternMatches.missing(
+      handledPatterns,
+      params.program,
+    );
+
+    if (wildcardPatterns.length === 0) {
+      return;
+    }
+
+    // If the branch is prefixed like `Foo.Bar.Biz ->`, prefix the
+    // patterns with the same qualifier (e.g. `Foo.Bar.`)
+    let prefix = "";
+    const firstPatternNode = handledPatterns[0];
+    if (firstPatternNode) {
+      const ids = firstPatternNode.descendantsOfType("upper_case_identifier");
+      if (ids && ids.length > 1) {
+        prefix = ids
+          .slice(0, -1)
+          .map((x) => x.text)
+          .join(".");
+      }
+    }
+
+    const coveredWithPrefix = wildcardPatterns.map((m) =>
+      prefix ? `${prefix}.${m}` : m,
+    );
+
+    const value = HintHelper.wrapCodeInMarkdown(coveredWithPrefix.join(" | "));
+
+    return {
+      contents: {
+        kind: MarkupKind.Markdown,
+        value,
+      },
+    };
   }
 }
